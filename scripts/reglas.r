@@ -7,6 +7,7 @@ library(arulesViz)
 car_data <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data", sep=",", header=FALSE)
 colnames(car_data) <- c("buying","maint","doors","persons","lug_boot","safety","class")
 
+
 #visualización para ver como se reparte la tabla
 apply(car_data,2,table)
 
@@ -121,3 +122,10 @@ cfMatrix
 # Detection Rate           0.1667    0.000000       0.6806      0.00463
 # Detection Prevalence     0.2338    0.039352       0.6829      0.04398
 # Balanced Accuracy        0.8090    0.480278       0.9448      0.98023
+
+cm_table <- as.data.frame(cfMatrix$table)
+
+cm_table[cm_table$Prediction=="acc",]
+
+
+
