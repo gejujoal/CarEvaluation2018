@@ -1,11 +1,13 @@
-#ibrerias necesarias
-library(caret)
-library(arules)
-library(arulesViz)
+#ibrerias necesarias, si no estan instaladas se instalaran
+if (!require(caret)) install.packages("caret")
+if (!require(arules)) install.packages("arules")
+if (!require(arulesViz)) install.packages("arulesViz")
+
 
 #lectura de datos
 car_data <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data", sep=",", header=FALSE)
 colnames(car_data) <- c("buying","maint","doors","persons","lug_boot","safety","class")
+
 
 #visualización para ver como se reparte la tabla
 apply(car_data,2,table)
@@ -121,3 +123,38 @@ cfMatrix
 # Detection Rate           0.1667    0.000000       0.6806      0.00463
 # Detection Prevalence     0.2338    0.039352       0.6829      0.04398
 # Balanced Accuracy        0.8090    0.480278       0.9448      0.98023
+
+#Guardamos la tabla de la matriz de confusion para usarlo con gpplot
+cm_table <- as.data.frame(cfMatrix$table)
+
+#Para cada tipo de clase se guardan en diferentes DF y se usa ggplot para ver de manera mas grafica en que clase es mejor el modelo
+tab_acc <- cm_table[cm_table$Prediction=="acc",]
+
+ggplot(tab_acc, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'acc'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_good <- cm_table[cm_table$Prediction=="good",]
+
+ggplot(tab_good, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'good'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_unacc <- cm_table[cm_table$Prediction=="unacc",]
+
+ggplot(tab_unacc, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'unacc'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_vgood <- cm_table[cm_table$Prediction=="vgood",]
+
+ggplot(tab_vgood, aes(Prediction,  Freq )) +   
+  ggtitle("Predicciones reales vs la asignada como 'vgood'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+
+#Conclusiones
+
+
+
+
