@@ -1,0 +1,196 @@
+---
+title: "Car Evaluation 2018"
+author: ""
+date: "5 de diciembre de 2017"
+output: html_document
+---
+
+Car Evaluation 2018
+========================================================
+
+# Introduccion
+
+Trabajo para el curso de Ciencia Abierta del programa de Doctorado de la UGR.
+El dataset utilizado para este trabajo es "Car Evaluation Data Set", de Bohanec M. y Zupan B. [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/car+evaluation). Este dataset esta formado por 6 variables, ademas de la variable de clase que indica si el coche es aceptable o no.
+
+Las variables son las siguientes:
+
+- **buying**: Precio del coche. Valores: vhigh, high, med, low.
+- **maint**: Precio de mantenimiento. Valores: vhigh, high, med, low.
+- **doors**: Numero de puertas. Valores: 2, 3, 4, 5more.
+- **persons**: Numero de pasajeros. Valores: 2, 4, more.
+- **lug_boot**: Tamaño del maletero. Valores: small, med, big.
+- **safety**: Seguridad del coche. Valores: high, med, low.
+
+```{r setup, include=FALSE}
+# Inicializa el entorno y carga dataset
+# Librerias necesarias, si no estan instaladas se instalaran
+if (!require(caret)) install.packages("caret")
+if (!require(arules)) install.packages("arules")
+if (!require(arulesViz)) install.packages("arulesViz")
+
+#lectura de datos
+car_data <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data", sep=",", header=FALSE)
+colnames(car_data) <- c("buying","maint","doors","persons","lug_boot","safety","class")
+
+
+#visualización para ver como se reparte la tabla
+apply(car_data,2,table)
+
+#nos centramos en ver los coches no seguros y seguros para tener una idea a priori
+cars_unacc <- car_data[car_data$class=="unacc",]
+apply(cars_unacc,2,table)
+
+cars_good <- car_data[car_data$class=="vgood",]
+apply(cars_good,2,table)
+```
+
+
+# Reglas de Asociacion
+
+Se han aplicado reglas de asociacion con el objetivo de detectar asociaciones entre las diferentes variables del dataset, de forma que podamos comprender mejor dicho dataset y que variables son mas interesantes de cara a clasificar y evaluar los coches.
+
+En primer lugar aplicamos el algoritmo [Apriori](https://www.it.uu.se/edu/course/homepage/infoutv/ht08/vldb94_rj.pdf), con un soporte minimo de 0.09 y una confianza de 0.8.
+
+```{r}
+###################APLICAMOS REGLAS DE ASOCIACION############################
+# Aplica Apriori
+rules <- apriori(car_data, parameter = list(minlen=2, supp=0.09, conf=0.8), control = list(verbose=F))
+length(rules)
+
+rules.sorted <- sort(rules, by="support")
+inspect(rules.sorted)
+```
+
+Como podemos ver, obtenemos un conjunto de 16 reglas. Ordenadas por la medida de soporte, las dos primeras reglas nos proporcionan gran informacion, puesto que nos indican que en un 33% (soporte=0.33) de los casos de nuestro dataset la compra de dicho coche sera inaceptable en caso de que la seguridad proporcionada por este sea baja o el numero de pasajeros sea 2 (es el minimo). Esto nos indica que, en general, segun nuestro dataset aquello coches que cumplan alguna o ambas de estas reglas seran, probablemente, inaceptables.
+
+Ademas, tambien hemos obtenido las siguientes reglas:
+
+- [11] {persons=2,safety=high}     => {class=unacc} 0.11111111 1.0000000  1.428099 192  
+- [12] {persons=2,safety=med}      => {class=unacc} 0.11111111 1.0000000  1.428099 192
+- [14] {persons=2,safety=low}      => {class=unacc} 0.11111111 1.0000000  1.428099 192
+
+Que nos indican que, si el numero de pasajeros es 2, no importa la seguridad del coche pues este sera igualmente inaceptable.
+
+```{r}
+plot(rules, method="graph", control=list(type="items"), measure='support', shading='confidence')
+```
+
+Tambien podemos ver la reglas de forma visual a partir del grafico anterior. Podemos ver las relaciones entre items (pares atributo-valor) siguiendo las flechas que los unen. Los puntos intermedios nos indican el valor de las medidas, en este caso el tamaño nos indica el soporte y el color la confianza. En el grafico podemos ver como los items 'safety=low' y 'persons=2' estan unidos a puntos de un tamaño mayor y finalmente se unen a 'class=unacc'. Esto nos indica, como ya comentabamos antes, que si la seguridad es baja o el numero de pasajeros 2, entonces, el coche es inaceptable.
+
+A partir de las reglas de asociacion nos queda claro que las variables mas importantes para evaluar un coche son el numero de pasajeros y la seguridad. Si alguna de estas variables es "mala", entonces el coche no sera aceptable.
+
+# Random Forest
+
+```{r}
+#######PASAMOS A RANDOM FOREST PARA PREDECIR LA SEGURIDAD DEL COCHE SEGUN ATRIBUTOS
+
+## 75%  para entrenar
+smp_size <- floor(0.75 * nrow(car_data))
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(car_data)), size = smp_size)
+
+train <- car_data[train_ind, ]
+test <- car_data[-train_ind, ]
+
+#como control haremos un CV con los siguientes parámertos
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "Accuracy"
+set.seed(seed)
+mtry <- sqrt(ncol(train))
+tunegrid <- expand.grid(.mtry=mtry)
+rf_default <- train(class~., data=train, method="rf", metric=metric, tuneGrid=tunegrid, trControl=control)
+
+#visualizamos el acc del RF
+print(rf_default)
+# 
+# Random Forest 
+# 
+# 1296 samples
+# 6 predictor
+# 4 classes: 'acc', 'good', 'unacc', 'vgood' 
+# 
+# No pre-processing
+# Resampling: Cross-Validated (10 fold, repeated 3 times) 
+# Summary of sample sizes: 1165, 1166, 1166, 1167, 1168, 1167, ... 
+# Resampling results:
+#   
+#   Accuracy   Kappa    
+# 0.8608195  0.6643527
+# 
+# Tuning paramter 'mtry' was held constant at a value of 2.645751
+# 
+
+# Con los datos de test validamos el modelo y vemos la matriz de confusión
+test_predict <- predict(rf_default,test)
+cfMatrix <- confusionMatrix(data = test$class, test_predict)
+
+cfMatrix
+# 
+# 
+# Confusion Matrix and Statistics
+# 
+# Reference
+# Prediction acc good unacc vgood
+# acc    72    1    28     0
+# good   15    0     2     0
+# unacc   1    0   294     0
+# vgood  14    0     3     2
+# 
+# Overall Statistics
+# 
+# Accuracy : 0.8519         
+# 95% CI : (0.8148, 0.884)
+# No Information Rate : 0.7569         
+# P-Value [Acc > NIR] : 8.744e-07      
+# 
+# Kappa : 0.6535         
+# Mcnemar's Test P-Value : NA             
+# 
+# Statistics by Class:
+# 
+#                      Class: acc Class: good Class: unacc Class: vgood
+# Sensitivity              0.7059    0.000000       0.8991      1.00000
+# Specificity              0.9121    0.960557       0.9905      0.96047
+# Pos Pred Value           0.7129    0.000000       0.9966      0.10526
+# Neg Pred Value           0.9094    0.997590       0.7591      1.00000
+# Prevalence               0.2361    0.002315       0.7569      0.00463
+# Detection Rate           0.1667    0.000000       0.6806      0.00463
+# Detection Prevalence     0.2338    0.039352       0.6829      0.04398
+# Balanced Accuracy        0.8090    0.480278       0.9448      0.98023
+
+#Guardamos la tabla de la matriz de confusion para usarlo con gpplot
+cm_table <- as.data.frame(cfMatrix$table)
+
+#Para cada tipo de clase se guardan en diferentes DF y se usa ggplot para ver de manera mas grafica en que clase es mejor el modelo
+tab_acc <- cm_table[cm_table$Prediction=="acc",]
+
+ggplot(tab_acc, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'acc'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_good <- cm_table[cm_table$Prediction=="good",]
+
+ggplot(tab_good, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'good'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_unacc <- cm_table[cm_table$Prediction=="unacc",]
+
+ggplot(tab_unacc, aes(Prediction, Freq)) +   
+  ggtitle("Predicciones reales vs la asignada como 'unacc'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+
+tab_vgood <- cm_table[cm_table$Prediction=="vgood",]
+
+ggplot(tab_vgood, aes(Prediction,  Freq )) +   
+  ggtitle("Predicciones reales vs la asignada como 'vgood'")+
+  geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
+```
+
+# Conclusiones
+
+
+A partir de la aplicacion de tecnicas de extraccion de reglas de asociacion hemos podido ver que las variables mas importantes para evaluar un coche son el numero de pasajeros y la seguridad. Si alguna de estas variables tiene un valor bajo, entonces el coche no sera aceptable.
+
