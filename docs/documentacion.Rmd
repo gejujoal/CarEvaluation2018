@@ -1,33 +1,35 @@
 ---
-title: "Car Evaluation 2018"
-author: ""
+title: "Car Evaluation 2018 summary"
+author: '\mbox{Juan Carlos Bailón Elvira, Gerardo González-Cordero,} \mbox{José López-Jiménez, Luis Alberto Segura Delgado} \mbox{\{bailone,segura2010\}@correo.ugr.es, g2cordr@gmail.com, joselj@ugr.es}'
 date: "5 de diciembre de 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 Car Evaluation 2018
 ========================================================
 
-# Introduccion
+# Introducción
 
 Trabajo para el curso de Ciencia Abierta del programa de Doctorado de la UGR.
-El dataset utilizado para este trabajo es "Car Evaluation Data Set", de Bohanec M. y Zupan B. [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/car+evaluation). Este dataset esta formado por 6 variables, ademas de la variable de clase que indica si el coche es aceptable o no.
+El dataset utilizado para este trabajo es "Car Evaluation Data Set", de Bohanec M. y Zupan B. [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/car+evaluation). Este dataset está formado por 6 variables, además de la variable de clase que indica si el coche es aceptable o no.
 
 Las variables son las siguientes:
 
 - **buying**: Precio del coche. Valores: vhigh, high, med, low.
 - **maint**: Precio de mantenimiento. Valores: vhigh, high, med, low.
-- **doors**: Numero de puertas. Valores: 2, 3, 4, 5more.
-- **persons**: Numero de pasajeros. Valores: 2, 4, more.
+- **doors**: Número de puertas. Valores: 2, 3, 4, 5more.
+- **persons**: Número de pasajeros. Valores: 2, 4, more.
 - **lug_boot**: Tamaño del maletero. Valores: small, med, big.
 - **safety**: Seguridad del coche. Valores: high, med, low.
 
 ```{r setup, include=FALSE}
 # Inicializa el entorno y carga dataset
 # Librerias necesarias, si no estan instaladas se instalaran
-if (!require(caret)) install.packages("caret")
-if (!require(arules)) install.packages("arules")
-if (!require(arulesViz)) install.packages("arulesViz")
+if (!require(caret)) install.packages("caret",repos="https://cran.us.r-project.org")
+if (!require(arules)) install.packages("arules",repos="https://cran.us.r-project.org")
+if (!require(arulesViz)) install.packages("arulesViz",repos="https://cran.us.r-project.org")
 
 #lectura de datos
 car_data <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data", sep=",", header=FALSE)
@@ -46,15 +48,19 @@ apply(cars_good,2,table)
 ```
 
 
-# Reglas de Asociacion
+# Reglas de Asociación
 
-Se han aplicado reglas de asociacion con el objetivo de detectar asociaciones entre las diferentes variables del dataset, de forma que podamos comprender mejor dicho dataset y que variables son mas interesantes de cara a clasificar y evaluar los coches.
+Se han aplicado reglas de asociación con el objetivo de detectar asociaciones entre las diferentes variables del dataset, de forma que podamos comprender mejor dicho dataset y qué variables son mas interesantes de cara a clasificar y evaluar los coches.
 
 En primer lugar aplicamos el algoritmo [Apriori](https://www.it.uu.se/edu/course/homepage/infoutv/ht08/vldb94_rj.pdf), con un soporte minimo de 0.09 y una confianza de 0.8.
 
 ```{r}
 ###################APLICAMOS REGLAS DE ASOCIACION############################
 # Aplica Apriori
+library('arules')
+library('arulesViz')
+library('caret')
+
 rules <- apriori(car_data, parameter = list(minlen=2, supp=0.09, conf=0.8), control = list(verbose=F))
 length(rules)
 
@@ -62,23 +68,23 @@ rules.sorted <- sort(rules, by="support")
 inspect(rules.sorted)
 ```
 
-Como podemos ver, obtenemos un conjunto de 16 reglas. Ordenadas por la medida de soporte, las dos primeras reglas nos proporcionan gran informacion, puesto que nos indican que en un 33% (soporte=0.33) de los casos de nuestro dataset la compra de dicho coche sera inaceptable en caso de que la seguridad proporcionada por este sea baja o el numero de pasajeros sea 2 (es el minimo). Esto nos indica que, en general, segun nuestro dataset aquello coches que cumplan alguna o ambas de estas reglas seran, probablemente, inaceptables.
+Como podemos ver, obtenemos un conjunto de 16 reglas. Ordenadas por la medida de soporte, las dos primeras reglas nos proporcionan gran cantidad de información, puesto que nos indican que en un 33% (soporte=0.33) de los casos de nuestro dataset la compra de dicho coche será inaceptable en caso de que la seguridad proporcionada por este sea baja o el número de pasajeros sea 2 (es el mínimo). Esto nos indica que, en general, segun nuestro dataset aquellos coches que cumplan alguna o ambas de estas reglas seran, probablemente, inaceptables.
 
-Ademas, tambien hemos obtenido las siguientes reglas:
+Ademas, también hemos obtenido las siguientes reglas:
 
 - [11] {persons=2,safety=high}     => {class=unacc} 0.11111111 1.0000000  1.428099 192  
 - [12] {persons=2,safety=med}      => {class=unacc} 0.11111111 1.0000000  1.428099 192
 - [14] {persons=2,safety=low}      => {class=unacc} 0.11111111 1.0000000  1.428099 192
 
-Que nos indican que, si el numero de pasajeros es 2, no importa la seguridad del coche pues este sera igualmente inaceptable.
+Que nos indican que, si el número de pasajeros es 2, no importa la seguridad del coche pues este será igualmente inaceptable.
 
 ```{r}
 plot(rules, method="graph", control=list(type="items"), measure='support', shading='confidence')
 ```
 
-Tambien podemos ver la reglas de forma visual a partir del grafico anterior. Podemos ver las relaciones entre items (pares atributo-valor) siguiendo las flechas que los unen. Los puntos intermedios nos indican el valor de las medidas, en este caso el tamaño nos indica el soporte y el color la confianza. En el grafico podemos ver como los items 'safety=low' y 'persons=2' estan unidos a puntos de un tamaño mayor y finalmente se unen a 'class=unacc'. Esto nos indica, como ya comentabamos antes, que si la seguridad es baja o el numero de pasajeros 2, entonces, el coche es inaceptable.
+También podemos ver la reglas de forma visual a partir del gráfico anterior. Podemos ver las relaciones entre items (pares atributo-valor) siguiendo las flechas que los unen. Los puntos intermedios nos indican el valor de las medidas, en este caso el tamaño nos indica el soporte y el color la confianza. En el gráfico podemos ver cómo los items 'safety=low' y 'persons=2' están unidos a puntos de un tamaño mayor y finalmente se unen a 'class=unacc'. Esto nos indica, como ya comentábamos antes, que si la seguridad es baja o el número de pasajeros 2, entonces, el coche es inaceptable.
 
-A partir de las reglas de asociacion nos queda claro que las variables mas importantes para evaluar un coche son el numero de pasajeros y la seguridad. Si alguna de estas variables es "mala", entonces el coche no sera aceptable.
+A partir de las reglas de asociación nos queda claro que las variables mas importantes para evaluar un coche son el numero de pasajeros y la seguridad. Si alguna de estas variables es "mala", entonces el coche no sera aceptable.
 
 # Random Forest
 
@@ -97,7 +103,7 @@ test <- car_data[-train_ind, ]
 #como control haremos un CV con los siguientes parámertos
 control <- trainControl(method="repeatedcv", number=10, repeats=3)
 metric <- "Accuracy"
-set.seed(seed)
+set.seed(141)
 mtry <- sqrt(ncol(train))
 tunegrid <- expand.grid(.mtry=mtry)
 rf_default <- train(class~., data=train, method="rf", metric=metric, tuneGrid=tunegrid, trControl=control)
@@ -189,8 +195,15 @@ ggplot(tab_vgood, aes(Prediction,  Freq )) +
   geom_bar(aes(fill = Reference), position = "dodge", stat="identity")
 ```
 
+El clasificador elaborado mediante la técnica Random Forests ha sido entrenado con el 75% de las muestras del dataset escogido. El 25% de las muestras restantes han sido empleadas para verificar el rendimiento del clasificador.
+
+Como resultados más generales extraídos de la matriz de confusión, puede verse que la exactitud del clasificador se encuentra en 0.86, esto es, aproximadamente un 10% por encima de la Tasa de No Información (_NIR_ por sus siglas en inglés).
+
+Es destacable que la tasa de aciertos para las clases _unacc_ y _acc_ son notablemente más altas que para las otras dos clases _good_ y _vgood_. Esta diferencia está directamente relacionada con la frecuencia con la que se dan estas clases en el _dataset_ original. Cabe pensar que, de poder proporcionar mayor cantidad de muestras de estas últimas clases durante el entrenamiento, el rendimiento del clasificador mejoraría notablemente.
+
 # Conclusiones
 
 
 A partir de la aplicacion de tecnicas de extraccion de reglas de asociacion hemos podido ver que las variables mas importantes para evaluar un coche son el numero de pasajeros y la seguridad. Si alguna de estas variables tiene un valor bajo, entonces el coche no sera aceptable.
 
+El clasificador desarrollado obtiene una tasa de aciertos notablemente positiva para las clases más pobladas, especialmente a la hora de determinar si un coche es calificado como inaceptable o como alguna de las otras tres opciones.
